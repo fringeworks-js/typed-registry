@@ -120,7 +120,7 @@ describe('Store', () => {
     it('単一タグのエントリーを正しく絞り込む', () => {
       const result = store.getByTag('gamma');
       expect(result).toHaveLength(1);
-      expect(result[0].key).toBe('h3');
+      expect(result[0]?.key).toBe('h3');
     });
 
     it('tagsが空配列のエントリーはいずれのタグ検索にもヒットしない', () => {
