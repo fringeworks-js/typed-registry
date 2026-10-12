@@ -1,6 +1,6 @@
 # @fringeworks/typed-registry
 
-`@fringeworks/typed-registry` is a niche library for managing classes that share the same interface in a type-safe registry.
+`@fringeworks/typed-registry` is a library some will find handy, for managing classes that share the same interface in a type-safe registry.
 Library authors provide their implementations under keys, and library users can use them by key without knowing the individual classes — and can add their own implementations in a child registry.
 
 **[日本語のREADMEはこちら](./README.ja.md)**

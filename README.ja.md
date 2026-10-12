@@ -1,6 +1,6 @@
 # @fringeworks/typed-registry
 
-`@fringeworks/typed-registry` は 同じインターフェイスを持つクラスを型安全なレジストリーで纏めて管理するためのニッチなライブラリです。
+`@fringeworks/typed-registry` は 同じインターフェイスを持つクラスを型安全なレジストリーで纏めて管理するための、誰かにとっては便利なライブラリです。
 ライブラリの作成者が実装をキーで提供すれば、ライブラリの利用者は個々のクラスを知らなくてもキーで利用でき、さらに子レジストリーに独自の実装を追加することもできます。
 
 **[English README is available here](./README.md)**
