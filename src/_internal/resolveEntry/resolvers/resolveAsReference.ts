@@ -1,4 +1,4 @@
-import type { StoreEntry } from '../../_types';
+import type { StoreEntry } from '../../types';
 
 /**
  * 値をそのまま返す

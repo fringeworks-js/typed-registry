@@ -1,14 +1,15 @@
+import type { IsUnion } from 'type-fest';
 import type TypedRegistry from './TypedRegistry';
 
 /**
  * 任意のクラス
  */
-type AnyClass = new (...args: any[]) => any;
+type AnyClass = new (...args: never) => unknown;
 
 /**
  * 任意の関数
  */
-type AnyFunction = (...args: any[]) => any;
+type AnyFunction = (...args: never) => unknown;
 
 /**
  * クラスとファクトリー関数の登録に共通するオプション
@@ -17,7 +18,7 @@ type InstanceEntryOptions = {
   /**
    * タグ
    */
-  tags?: string[];
+  tags?: readonly string[];
 
   /**
    * シングルトン
@@ -69,7 +70,7 @@ export type ValueEntry<V = unknown> = {
   /**
    * タグ
    */
-  tags?: string[];
+  tags?: readonly string[];
 };
 
 /**
@@ -80,9 +81,9 @@ export type ValueEntry<V = unknown> = {
  * - 値: { value }
  */
 export type RegistryEntry<Base = unknown> =
-  | (new (...args: any[]) => Base)
-  | ClassEntry<new (...args: any[]) => Base>
-  | FactoryEntry<(...args: any[]) => Base>
+  | (new (...args: never) => Base)
+  | ClassEntry<new (...args: never) => Base>
+  | FactoryEntry<(...args: never) => Base>
   | ValueEntry<Base>;
 
 /**
@@ -108,7 +109,7 @@ export type RegistryEntries<Base = unknown> = Record<
  * type ValidatorSpec = ResolveSpec<RegistryEntriesOf<typeof validators>>;
  */
 export type RegistryEntriesOf<R> =
-  R extends TypedRegistry<infer E, any> ? E : never;
+  R extends TypedRegistry<infer E, infer _Base> ? E : never;
 
 /**
  * 登録内容から取得可能なキー
@@ -131,11 +132,11 @@ type RawOf<X> = X extends AnyClass
 /**
  * 登録内容の1件から、取得されるものの型
  */
-type OutputOf<X> = X extends new (...args: any[]) => infer I
+type OutputOf<X> = X extends new (...args: never) => infer I
   ? I
-  : X extends { class: new (...args: any[]) => infer I }
+  : X extends { class: new (...args: never) => infer I }
     ? I
-    : X extends { factory: (...args: any[]) => infer R }
+    : X extends { factory: (...args: never) => infer R }
       ? R
       : X extends { value: infer V }
         ? V
@@ -144,11 +145,11 @@ type OutputOf<X> = X extends new (...args: any[]) => infer I
 /**
  * 登録内容の1件から、resolve に渡す引数の型
  */
-type ArgsOf<X> = X extends new (...args: infer A) => any
+type ArgsOf<X> = X extends new (...args: infer A) => unknown
   ? A
-  : X extends { class: new (...args: infer A) => any }
+  : X extends { class: new (...args: infer A) => unknown }
     ? A
-    : X extends { factory: (...args: infer A) => any }
+    : X extends { factory: (...args: infer A) => unknown }
       ? A
       : [];
 
@@ -203,11 +204,28 @@ export type ResolveOptions<Args extends unknown[] = unknown[]> = {
 /**
  * resolve の options 部分の引数
  *
- * 必須の引数がある場合は options と args を必須にする
+ * - 必須の引数がある場合は options と args を必須にする
+ * - キーが union の場合は、どのキーも必須の引数を持たない場合だけ受け付ける。
+ *   実行時のキーに合う args を型で保証できないため。必須の引数を持つキーを含む場合は resolveSpec を使う
  */
-export type ResolveRestArgs<Args extends unknown[]> = [] extends Args
-  ? [options?: ResolveOptions<Args>]
-  : [options: Required<ResolveOptions<Args>>];
+export type ResolveRestArgs<E, K extends keyof E> =
+  IsUnion<K> extends true
+    ? true extends HasRequiredArgs<E, K>
+      ? [options: never]
+      : [options?: ResolveOptions<ResolveArgs<E, K>>]
+    : HasRequiredArgs<E, K> extends true
+      ? [options: Required<ResolveOptions<ResolveArgs<E, K>>>]
+      : [options?: ResolveOptions<ResolveArgs<E, K>>];
+
+/**
+ * キーに対応するものが必須の引数を持つか
+ * キーが union の場合はキー毎に判定する
+ */
+type HasRequiredArgs<E, K extends keyof E> = K extends unknown
+  ? [] extends ResolveArgs<E, K>
+    ? false
+    : true
+  : never;
 
 /**
  * resolveSpec に渡す、キーと引数の組

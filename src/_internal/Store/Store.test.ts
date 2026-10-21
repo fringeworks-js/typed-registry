@@ -1,6 +1,5 @@
 import type { SetOptional } from 'type-fest';
-import { beforeEach, describe, expect, it } from 'vitest';
-import type { ResolverType, StoreEntry } from '../_types';
+import type { ResolverType, StoreEntry } from '../types';
 import Store from './Store';
 
 // テスト用のダミー値
@@ -22,81 +21,71 @@ describe('Store', () => {
     store = new Store();
   });
 
-  // --- constructor ---
-
   describe('constructor', () => {
-    it('初期状態でエントリーが空である', () => {
+    test('初期状態でエントリーが空である', () => {
       expect(store.getEntries()).toHaveLength(0);
     });
   });
 
-  // --- set / get ---
-
   describe('set / get', () => {
-    it('登録したエントリーをkeyで取得できる', () => {
+    test('登録したエントリーをkeyで取得できる', () => {
       const entry = makeEntry({ key: 'a', value: 'hello', tags: ['x'] });
       store.set(entry);
       expect(store.get('a')).toEqual({ ...entry, tags: ['x'] });
     });
 
-    it('tagsを省略した場合、空配列として保存される', () => {
+    test('tagsを省略した場合、空配列として保存される', () => {
       store.set(makeEntry({ key: 'b', value: 'world' }));
       expect(store.get('b')?.tags).toEqual([]);
     });
 
-    it('singletonフラグが保持される', () => {
+    test('singletonフラグが保持される', () => {
       store.set(makeEntry({ key: 'c', singleton: true }));
       expect(store.get('c')?.singleton).toBe(true);
     });
 
-    it('valueが未設定のエントリーを登録できる', () => {
+    test('valueが未設定のエントリーを登録できる', () => {
       store.set(makeEntry({ key: 'd' }));
       expect(store.get('d')).toBeDefined();
       expect(store.get('d')?.value).toBeUndefined();
     });
 
-    it('同じkeyで上書き登録できる', () => {
+    test('同じkeyで上書き登録できる', () => {
       store.set(makeEntry({ key: 'e', value: 'first' }));
       store.set(makeEntry({ key: 'e', value: 'second', tags: ['updated'] }));
       expect(store.get('e')?.value).toBe('second');
       expect(store.get('e')?.tags).toEqual(['updated']);
     });
 
-    it('存在しないkeyはundefinedを返す', () => {
+    test('存在しないkeyはundefinedを返す', () => {
       expect(store.get('nonexistent')).toBeUndefined();
     });
   });
 
-  // --- has ---
-
   describe('has', () => {
-    it('登録済みのkeyはtrueを返す', () => {
+    test('登録済みのkeyはtrueを返す', () => {
       store.set(makeEntry({ key: 'f' }));
       expect(store.has('f')).toBe(true);
     });
 
-    it('未登録のkeyはfalseを返す', () => {
+    test('未登録のkeyはfalseを返す', () => {
       expect(store.has('missing')).toBe(false);
     });
   });
 
-  // --- getEntries ---
-
   describe('getEntries', () => {
-    it('登録した全エントリーを返す', () => {
+    test('登録した全エントリーを返す', () => {
       store.set(makeEntry({ key: 'g1' }));
       store.set(makeEntry({ key: 'g2' }));
       expect(store.getEntries()).toHaveLength(2);
     });
 
-    it('返り値の配列を操作しても内部状態に影響しない', () => {
+    test('返り値の配列を操作しても内部状態に影響しない', () => {
       store.set(makeEntry({ key: 'g3' }));
       store.getEntries().pop();
       expect(store.getEntries()).toHaveLength(1);
     });
   });
-
-  // --- getByTag ---
 
   describe('getByTag', () => {
     beforeEach(() => {
@@ -105,7 +94,7 @@ describe('Store', () => {
       store.set(makeEntry({ key: 'h3', tags: ['gamma'] }));
     });
 
-    it('指定タグを持つエントリーのみ返す', () => {
+    test('指定タグを持つエントリーのみ返す', () => {
       const result = store.getByTag('beta');
       expect(result).toHaveLength(2);
       expect(result.map((e) => e.key)).toEqual(
@@ -113,19 +102,51 @@ describe('Store', () => {
       );
     });
 
-    it('一致するエントリーがなければ空配列を返す', () => {
+    test('一致するエントリーがなければ空配列を返す', () => {
       expect(store.getByTag('nonexistent')).toEqual([]);
     });
 
-    it('単一タグのエントリーを正しく絞り込む', () => {
+    test('単一タグのエントリーを正しく絞り込む', () => {
       const result = store.getByTag('gamma');
       expect(result).toHaveLength(1);
       expect(result[0]?.key).toBe('h3');
     });
 
-    it('tagsが空配列のエントリーはいずれのタグ検索にもヒットしない', () => {
+    test('tagsが空配列のエントリーはいずれのタグ検索にもヒットしない', () => {
       store.set(makeEntry({ key: 'h4', tags: [] }));
       expect(store.getByTag('alpha').map((e) => e.key)).not.toContain('h4');
+    });
+  });
+
+  describe('親の Store', () => {
+    let parent: Store;
+
+    beforeEach(() => {
+      parent = new Store();
+      parent.set(makeEntry({ key: 'p1', tags: ['alpha'] }));
+      parent.set(makeEntry({ key: 'p2', tags: ['alpha'] }));
+    });
+
+    test('作成時点の親のエントリーを引き継ぐ', () => {
+      const child = new Store(parent);
+      expect(child.has('p1')).toBe(true);
+      expect(child.get('p1')).toBe(parent.get('p1'));
+      expect(child.getEntries().map((e) => e.key)).toEqual(['p1', 'p2']);
+    });
+
+    test('子で登録したものは親に影響しない', () => {
+      const child = new Store(parent);
+      child.set(makeEntry({ key: 'c1' }));
+      expect(child.has('c1')).toBe(true);
+      expect(parent.has('c1')).toBe(false);
+    });
+
+    test('親と同じキーは子の中でのみ置き換わり、キーの順序を保つ', () => {
+      const child = new Store(parent);
+      child.set(makeEntry({ key: 'p1', tags: [] }));
+      expect(child.getEntries().map((e) => e.key)).toEqual(['p1', 'p2']);
+      expect(child.getByTag('alpha').map((e) => e.key)).toEqual(['p2']);
+      expect(parent.getByTag('alpha').map((e) => e.key)).toEqual(['p1', 'p2']);
     });
   });
 });

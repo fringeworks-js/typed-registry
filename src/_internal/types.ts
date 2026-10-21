@@ -1,9 +1,9 @@
-import type { ResolveOptions } from './types';
+import type { ResolveOptions } from '../types';
 
 /**
  * リゾルバー種別
  *
- * - instance: クラスからインスタンスを生成し返す
+ * - instance: クラスからインスタンスを生成して返す
  * - factory: 関数の戻り値を返す
  * - reference: 値をそのまま返す
  * - clone: 値のコピーを返す
@@ -32,7 +32,7 @@ export type StoreEntry = {
   /**
    * タグ
    */
-  tags: string[];
+  tags: readonly string[];
 
   /**
    * シングルトン

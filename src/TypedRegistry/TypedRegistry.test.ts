@@ -106,6 +106,16 @@ describe('TypedRegistry', () => {
       expect(result.options).toEqual(config.options);
     });
 
+    test('{ value, clone: true }: #private フィールドはコピーされない', () => {
+      const registry = new TypedRegistry({
+        counter: { value: new Counter(), clone: true },
+      });
+
+      const result = registry.resolve('counter');
+      expect(result).toBeInstanceOf(Counter);
+      expect(() => result.count()).toThrow(TypeError);
+    });
+
     test('singleton: 初回に生成したものを返し続ける', () => {
       const registry = new TypedRegistry({
         maxLength: { class: MaxLength, singleton: true },
@@ -126,6 +136,27 @@ describe('TypedRegistry', () => {
       ).toThrow(
         'Invalid entry for key "bad". Use a class, { class }, { factory } or { value }',
       );
+    });
+
+    test('種別を表すプロパティが複数ある登録内容は例外を投げる', () => {
+      expect(
+        () =>
+          new TypedRegistry({
+            bad: { class: Required, factory: () => new Required() },
+          } as unknown as { bad: typeof Required }),
+      ).toThrow(
+        'Invalid entry for key "bad". Use only one of { class }, { factory }',
+      );
+    });
+
+    test('登録後に元の tags の配列を書き換えても影響しない', () => {
+      const tags = ['basic'];
+      const registry = new TypedRegistry({
+        required: { class: Required, tags },
+      });
+
+      tags.push('length');
+      expect(registry.getRawByTag('length')).toEqual([]);
     });
 
     test('空の登録内容を渡すと空のレジストリーになる', () => {
@@ -217,6 +248,20 @@ describe('TypedRegistry', () => {
       expect((result[0] as MaxLength).max).toBe(2);
       expect((result[1] as MaxLength).max).toBe(5);
     });
+
+    test('resolveByTag: singleton のものは resolve と同じものを返す', () => {
+      const registry = new TypedRegistry({
+        short: {
+          factory: () => new MaxLength(5),
+          tags: ['length'],
+          singleton: true,
+        },
+      });
+
+      expect(registry.resolveByTag('length')[0]).toBe(
+        registry.resolve('short'),
+      );
+    });
   });
 
   describe('extend', () => {
@@ -247,6 +292,14 @@ describe('TypedRegistry', () => {
       expect(parent.resolve('required')).not.toBeInstanceOf(MyRequired);
       // 差し替えたものはキーの順序を保つ
       expect(child.keys()).toEqual(['required', 'maxLength']);
+    });
+
+    test('子で差し替えたもののタグは子のものを使う', () => {
+      const parent = createParent();
+      const child = parent.extend({ required: Required });
+
+      expect(child.getRawByTag('basic')).toEqual([MaxLength]);
+      expect(parent.getRawByTag('basic')).toEqual([Required, MaxLength]);
     });
 
     test('孫レジストリーは親と祖父母の登録内容を引き継ぐ', () => {

@@ -1,6 +1,6 @@
 # @fringeworks/typed-registry
 
-`@fringeworks/typed-registry` は 同じインターフェイスを持つクラスを型安全なレジストリーで纏めて管理するための、誰かにとっては便利なライブラリです。
+`@fringeworks/typed-registry` は、同じインターフェイスを持つクラスを型安全なレジストリーで纏めて管理するための、誰かにとっては便利なライブラリです。
 ライブラリの作成者が実装をキーで提供すれば、ライブラリの利用者は個々のクラスを知らなくてもキーで利用でき、さらに子レジストリーに独自の実装を追加することもできます。
 
 **[English README is available here](./README.md)**
@@ -89,17 +89,22 @@ validators.resolve('pattern', { args: [/^\d+$/] }); // Pattern
 
 `{ class }` / `{ factory }`
 
-| オプション  | 型         | 説明                                                                                 |
-| ----------- | ---------- | ------------------------------------------------------------------------------------ |
-| `tags`      | `string[]` | `resolveByTag` / `getRawByTag` で使用するタグ                                        |
-| `singleton` | `boolean`  | 初回に返したものを返し続ける。2回目以降の `resolve` で渡された `args` は使用されない |
+| オプション   | 型                  | 説明                                                                                 |
+| ------------ | ------------------- | ------------------------------------------------------------------------------------ |
+| `tags?`      | `readonly string[]` | `resolveByTag` / `getRawByTag` で使用するタグ                                        |
+| `singleton?` | `boolean`           | 初回に返したものを返し続ける。2回目以降の `resolve` で渡された `args` は使用されない |
 
 `{ value }`
 
-| オプション | 型         | 説明                                                                 |
-| ---------- | ---------- | -------------------------------------------------------------------- |
-| `tags`     | `string[]` | `resolveByTag` / `getRawByTag` で使用するタグ                        |
-| `clone`    | `boolean`  | `resolve` の度にディープコピーを返す。未指定の場合は値をそのまま返す |
+| オプション | 型                  | 説明                                                                 |
+| ---------- | ------------------- | -------------------------------------------------------------------- |
+| `tags?`    | `readonly string[]` | `resolveByTag` / `getRawByTag` で使用するタグ                        |
+| `clone?`   | `boolean`           | `resolve` の度にディープコピーを返す。未指定の場合は値をそのまま返す |
+
+`clone: true` のディープコピーには [klona](https://github.com/lukeed/klona)（`klona/full`）を使います。次の制約があります。
+
+- クラスのインスタンスは、プロトタイプと自身のプロパティをコピーします。`#private` のフィールドはコピーされないため、それを使うメソッドを呼ぶと `TypeError` になります
+- 関数はコピーせず、同じものを参照します
 
 ## 子レジストリー
 
@@ -198,42 +203,150 @@ const validators = new TypedRegistry({ ...required, ...maxLength });
 
 ## API
 
-### コンストラクター
+### `TypedRegistry<E, Base>`
 
-`new TypedRegistry(entries, options?)`
+| メソッド                         | 説明                                               |
+| -------------------------------- | -------------------------------------------------- |
+| `constructor(entries, options?)` | 登録内容を渡してレジストリーを作成する             |
+| `resolve(key, options?)`         | キーに対応するインスタンス・値を返す               |
+| `resolveSpec(spec)`              | キーと `args` の組に対応するインスタンス・値を返す |
+| `resolveByTag(tag, options?)`    | タグを持つ全てのエントリーのインスタンス・値を返す |
+| `has(key)`                       | キーが登録されているかを返す                       |
+| `keys()`                         | 登録されている全てのキーを返す                     |
+| `getRaw(key)`                    | 登録したクラス・関数・値をそのまま返す             |
+| `getRawByTag(tag)`               | タグを持つ登録したクラス・関数・値をそのまま返す   |
+| `extend(entries, options?)`      | 登録内容を追加・差し替えた子レジストリーを作成する |
+
+| プロパティ | 型                    | 説明              |
+| ---------- | --------------------- | ----------------- |
+| `id`       | `string \| undefined` | レジストリーの ID |
+
+#### `constructor`
+
+```ts
+constructor(entries: E, options?: TypedRegistryOptions)
+```
+
+登録内容を渡してレジストリーを作成します。登録内容は作成後に変更できません。\
+登録内容が不正な場合（種別を表す `class` / `factory` / `value` が無い、または複数ある場合）は例外を投げます。
+
+| 引数       | 型                     | 説明             |
+| ---------- | ---------------------- | ---------------- |
+| `entries`  | `E`                    | 登録内容         |
+| `options?` | `TypedRegistryOptions` | 下記のオプション |
 
 | オプション | 型       | 説明                                          |
 | ---------- | -------- | --------------------------------------------- |
-| `id`       | `string` | レジストリーの ID。例外のメッセージに含まれる |
+| `id?`      | `string` | レジストリーの ID。例外のメッセージに含まれる |
 
-### メンバー
+#### `resolve`
 
-| メンバー                      | 説明                                                                                     |
-| ----------------------------- | ---------------------------------------------------------------------------------------- |
-| `resolve(key, options?)`      | キーに対応するインスタンス・値を返す。登録されていないキーの場合は例外を投げる           |
-| `resolveSpec({ key, args })`  | キーと `args` を組で渡す `resolve`                                                       |
-| `resolveByTag(tag, options?)` | タグを持つ全てのエントリーのインスタンス・値を返す。全てのエントリーに同じ `args` を渡す |
-| `has(key)`                    | キーが登録されているかを返す                                                             |
-| `keys()`                      | 登録されている全てのキーを返す                                                           |
-| `getRaw(key)`                 | 登録したクラス・関数・値をそのまま返す。登録されていないキーの場合は例外を投げる         |
-| `getRawByTag(tag)`            | タグを持つ登録したクラス・関数・値をそのまま返す                                         |
-| `extend(entries, options?)`   | 登録内容を追加した子レジストリーを作成する                                               |
-| `id`                          | レジストリーの ID                                                                        |
+```ts
+resolve<K extends RegistryKey<E>>(
+  key: K,
+  ...[options]: ResolveRestArgs<E, K>
+): Resolved<Base, E, K>
+```
 
-## 型
+キーに対応するインスタンス・値を返します。登録されていないキーの場合は例外を投げます。\
+必須の引数がある場合は、`options` と `args` を省略できません。\
+キーが union の場合は、どのキーも必須の引数を持たない場合だけ受け付けます。実行時のキーに合う `args` を型で保証できないためです。必須の引数を持つキーを含む場合は `resolveSpec` を使ってください。
 
-| 型                       | 説明                                                                |
-| ------------------------ | ------------------------------------------------------------------- |
-| `TypedRegistry<E, Base>` | レジストリー。`Base` を指定すると取得したものを `Base` として扱える |
-| `RegistryEntries<Base>`  | 登録内容。`E` の制約や、`satisfies` での確認に使う                  |
-| `RegistryEntriesOf<R>`   | レジストリーの登録内容                                              |
-| `ResolveSpec<E>`         | キー毎の `{ key, args }` の組の union                               |
-| `RegistryKey<E>`         | キー                                                                |
-| `ResolveArgs<E, K>`      | キーに対応する `args`                                               |
-| `Resolved<Base, E, K>`   | キーに対応する `resolve` の戻り値                                   |
-| `RegistryRaw<E, K>`      | キーに対応する、登録したクラス・関数・値                            |
-| `RegistryValue<E>`       | 取得される全てのものの union                                        |
-| `TypedRegistryOptions`   | コンストラクターと `extend` のオプション                            |
+| 引数       | 型                     | 説明             |
+| ---------- | ---------------------- | ---------------- |
+| `key`      | `K`                    | キー             |
+| `options?` | `ResolveOptions<Args>` | 下記のオプション |
+
+| オプション | 型     | 説明                                                         |
+| ---------- | ------ | ------------------------------------------------------------ |
+| `args?`    | `Args` | コンストラクターまたはファクトリー関数の引数。値には渡せない |
+
+#### `resolveSpec`
+
+```ts
+resolveSpec<S extends ResolveSpec<E>>(spec: S): Resolved<Base, E, S['key']>
+```
+
+キーと `args` の組（`{ key, args }`）に対応するインスタンス・値を返します。登録されていないキーの場合は例外を投げます。\
+設定などから組み立てたキーと引数をそのまま渡す場合に使います。
+
+#### `resolveByTag`
+
+```ts
+resolveByTag(tag: string, options?: ResolveOptions): Base[]
+```
+
+タグを持つ全てのエントリーのインスタンス・値を、登録順に返します。全てのエントリーに同じ `args` を渡します。
+
+#### `has`
+
+```ts
+has(key: string): key is RegistryKey<E>
+```
+
+キーが登録されているかを返します。`true` の場合、`key` はレジストリーのキーの型に絞り込まれます。
+
+#### `keys`
+
+```ts
+keys(): RegistryKey<E>[]
+```
+
+登録されている全てのキーを、登録順に返します。
+
+#### `getRaw`
+
+```ts
+getRaw<K extends RegistryKey<E>>(key: K): RegistryRaw<E, K>
+```
+
+登録したクラス・関数・値をそのまま返します。登録されていないキーの場合は例外を投げます。
+
+#### `getRawByTag`
+
+```ts
+getRawByTag(tag: string): RegistryRaw<E>[]
+```
+
+タグを持つ登録したクラス・関数・値を、登録順にそのまま返します。
+
+#### `extend`
+
+```ts
+extend<E2 extends RegistryEntries>(
+  entries: E2,
+  options?: TypedRegistryOptions,
+): TypedRegistry<Merge<E, E2>>
+```
+
+親の登録内容を引き継ぎ、渡した登録内容を追加した子レジストリーを作成します。親と同じキーを渡した場合は、子の中でのみ差し替わります。子レジストリーは `Base` を引き継ぎません。レジストリーを受け取る関数の中で `extend` した子レジストリーは、`Base` として扱えません。拡張は、レジストリーを渡す前に利用者側で行ってください。
+
+| 引数       | 型                     | 説明                                         |
+| ---------- | ---------------------- | -------------------------------------------- |
+| `entries`  | `E2`                   | 追加・差し替える登録内容                     |
+| `options?` | `TypedRegistryOptions` | コンストラクターと同じオプション（親とは別） |
+
+### 型
+
+| 型                      | 説明                                               |
+| ----------------------- | -------------------------------------------------- |
+| `RegistryEntries<Base>` | 登録内容。`E` の制約や、`satisfies` での確認に使う |
+| `RegistryEntry<Base>`   | 登録内容の1件                                      |
+| `ClassEntry<C>`         | クラスの登録（`{ class }`）                        |
+| `FactoryEntry<F>`       | ファクトリー関数の登録（`{ factory }`）            |
+| `ValueEntry<V>`         | 値の登録（`{ value }`）                            |
+| `RegistryEntriesOf<R>`  | レジストリーの登録内容                             |
+| `ResolveSpec<E>`        | キー毎の `{ key, args }` の組の union              |
+| `RegistryKey<E>`        | キー                                               |
+| `ResolveArgs<E, K>`     | キーに対応する `args`                              |
+| `ResolveOptions<Args>`  | `resolve` / `resolveByTag` のオプション            |
+| `ResolveRestArgs<E, K>` | `resolve` の `options` 部分の引数                  |
+| `Resolved<Base, E, K>`  | キーに対応する `resolve` の戻り値                  |
+| `RegistryRaw<E, K>`     | キーに対応する、登録したクラス・関数・値           |
+| `RegistryValue<E>`      | 取得される全てのものの union                       |
+| `TypedRegistryOptions`  | コンストラクターと `extend` のオプション           |
+
+`TypedRegistry<E, Base>` の `Base` を指定すると、取得したものを `Base` として扱えます（「[レジストリーを受け取る](#レジストリーを受け取る)」を参照）。
 
 ## ライセンス
 

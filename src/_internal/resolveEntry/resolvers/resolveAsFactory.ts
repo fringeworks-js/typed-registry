@@ -1,5 +1,5 @@
-import type { StoreEntry } from '../../_types';
-import type { ResolveOptions } from '../../types';
+import type { ResolveOptions } from '../../../types';
+import type { StoreEntry } from '../../types';
 
 /**
  * 関数の戻り値を返す

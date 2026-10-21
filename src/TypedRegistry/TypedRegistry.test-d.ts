@@ -71,6 +71,19 @@ describe('登録内容からの推論', () => {
     validators.resolve('notEmpty', { args: [1] });
   });
 
+  test('resolve のキーが union の場合は、どのキーも必須の引数を持たない場合だけ受け付ける', () => {
+    const safeKey = 'required' as 'required' | 'notEmpty';
+    expectTypeOf(validators.resolve(safeKey)).toEqualTypeOf<
+      Required | { validate: (value: unknown) => boolean }
+    >();
+
+    const unsafeKey = 'required' as 'required' | 'maxLength';
+    // @ts-expect-error 必須の引数を持つキーを含む
+    validators.resolve(unsafeKey);
+    // @ts-expect-error 実行時のキーに合う args を保証できない
+    validators.resolve(unsafeKey, { args: [] });
+  });
+
   test('getRaw は登録したものの型を返す', () => {
     expectTypeOf(validators.getRaw('required')).toEqualTypeOf<
       typeof Required
@@ -86,10 +99,7 @@ describe('登録内容からの推論', () => {
   test('resolveByTag は全ての取得されるものの union を返す', () => {
     expectTypeOf(validators.resolveByTag('length')).toEqualTypeOf<
       (
-        | Required
-        | MaxLength
-        | Validator
-        | { validate: (v: unknown) => boolean }
+        Required | MaxLength | Validator | { validate: (v: unknown) => boolean }
       )[]
     >();
   });
@@ -128,6 +138,11 @@ describe('登録内容の書き方', () => {
       // @ts-expect-error Validator を満たさない
       bad: NotAValidator,
     } satisfies RegistryEntries<Validator>);
+  });
+
+  test('tags には readonly の配列を渡せる', () => {
+    const tags = ['basic'] as const;
+    new TypedRegistry({ required: { class: Required, tags } });
   });
 
   test('登録内容は省略できない', () => {

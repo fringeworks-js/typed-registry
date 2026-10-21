@@ -1,5 +1,5 @@
 import { klona } from 'klona/full';
-import type { StoreEntry } from '../../_types';
+import type { StoreEntry } from '../../types';
 
 /**
  * 値をディープコピーして返す

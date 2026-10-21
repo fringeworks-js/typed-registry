@@ -1,37 +1,36 @@
 import type { SetOptional } from 'type-fest';
-import type { StoreEntry } from '../_types';
+import type { StoreEntry } from '../types';
 
 /**
  * エントリーを保持するためのクラス
  *
- * 親の Store を指定した場合、自身に無いエントリーは親から取得する
+ * 親の Store を指定した場合は、作成時点の親のエントリーを引き継ぐ。
+ * レジストリーはイミュータブルで親が変わることは無いため、親を参照し続けずにコピーする。
+ * エントリーのオブジェクトは親と共有するため、singleton の値も親子で共有される
  */
 export default class Store {
   /**
    * エントリー
    */
-  private _entries = new Map<string, StoreEntry>();
-
-  /**
-   * 親の Store
-   */
-  private _parent: Store | undefined;
+  private _entries: Map<string, StoreEntry>;
 
   /**
    * コンストラクター
    * @param parent 親の Store
    */
   constructor(parent?: Store) {
-    this._parent = parent;
+    this._entries = new Map(parent?._entries);
   }
 
   /**
    * 要素の登録
+   * 同じキーの要素がある場合は置き換える（キーの順序は保つ）
    * @param entry 登録する要素
    */
   set(entry: SetOptional<StoreEntry, 'tags'>) {
     const { tags = [], ...rest } = entry;
-    this._entries.set(entry.key, { tags, ...rest });
+    // 呼び出し元の配列を書き換えても影響しないよう、コピーして保持する
+    this._entries.set(entry.key, { tags: [...tags], ...rest });
   }
 
   /**
@@ -39,7 +38,7 @@ export default class Store {
    * @param key キー
    */
   get(key: string): StoreEntry | undefined {
-    return this._entries.get(key) ?? this._parent?.get(key);
+    return this._entries.get(key);
   }
 
   /**
@@ -47,24 +46,14 @@ export default class Store {
    * @param key キー
    */
   has(key: string): boolean {
-    return this._entries.has(key) || !!this._parent?.has(key);
+    return this._entries.has(key);
   }
 
   /**
    * 登録されている全ての要素を取得
-   * 親と同じキーの要素は自身のもので置き換える
    */
   getEntries(): StoreEntry[] {
-    if (!this._parent) {
-      return Array.from(this._entries.values());
-    }
-    const entries = new Map(
-      this._parent.getEntries().map((entry) => [entry.key, entry]),
-    );
-    for (const [key, entry] of this._entries) {
-      entries.set(key, entry);
-    }
-    return Array.from(entries.values());
+    return Array.from(this._entries.values());
   }
 
   /**

@@ -1,14 +1,13 @@
 import type { Merge } from 'type-fest';
-import type { StoreEntry } from '../_types';
-import Resolver from '../Resolver';
-import Store from '../Store';
+import resolveEntry from '../_internal/resolveEntry';
+import Store from '../_internal/Store';
+import type { StoreEntry } from '../_internal/types';
 import type {
   RegistryEntries,
   RegistryEntry,
   RegistryKey,
   RegistryRaw,
   RegistryValue,
-  ResolveArgs,
   ResolveOptions,
   ResolveRestArgs,
   ResolveSpec,
@@ -27,6 +26,8 @@ import type { TypedRegistryOptions } from './types';
  * レジストリーを受け取る関数等で、取得したものを Base として扱いたい場合に指定する
  */
 export default class TypedRegistry<
+  // 登録内容が無い状態を表すため、空のオブジェクト型にする
+  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
   E extends RegistryEntries = {},
   Base = RegistryValue<E>,
 > {
@@ -41,11 +42,6 @@ export default class TypedRegistry<
   private _store: Store;
 
   /**
-   * Resolver
-   */
-  private _resolver: Resolver;
-
-  /**
    * コンストラクター
    * @param entries 登録内容
    * @param options
@@ -53,7 +49,6 @@ export default class TypedRegistry<
   constructor(entries: E, options?: TypedRegistryOptions) {
     this._id = options?.id;
     this._store = new Store();
-    this._resolver = new Resolver();
     this._setEntries(entries);
   }
 
@@ -68,6 +63,7 @@ export default class TypedRegistry<
    * 子レジストリーを作成する
    * 子レジストリーは親の登録内容を引き継ぎ、渡した登録内容を追加する
    * 親と同じキーを渡した場合は、子の中でのみ差し替わる
+   * Base は引き継がない。Base を引き継ぐと、Base を指定した型で受け取る際の型の比較が成り立たなくなるため
    * @param entries 追加・差し替える登録内容
    * @param options
    * @returns
@@ -130,13 +126,9 @@ export default class TypedRegistry<
    */
   resolve<K extends RegistryKey<E>>(
     key: K,
-    ...[options]: ResolveRestArgs<ResolveArgs<E, K>>
+    ...[options]: ResolveRestArgs<E, K>
   ): Resolved<Base, E, K> {
-    return this._resolver.resolve(this._getEntry(key), options) as Resolved<
-      Base,
-      E,
-      K
-    >;
+    return resolveEntry(this._getEntry(key), options) as Resolved<Base, E, K>;
   }
 
   /**
@@ -147,7 +139,7 @@ export default class TypedRegistry<
    * @returns
    */
   resolveSpec<S extends ResolveSpec<E>>(spec: S): Resolved<Base, E, S['key']> {
-    return this._resolver.resolve(this._getEntry(spec.key), {
+    return resolveEntry(this._getEntry(spec.key), {
       args: spec.args,
     }) as Resolved<Base, E, S['key']>;
   }
@@ -162,7 +154,7 @@ export default class TypedRegistry<
   resolveByTag(tag: string, options: ResolveOptions = {}): Base[] {
     return this._store
       .getByTag(tag)
-      .map((entry) => this._resolver.resolve(entry, options)) as Base[];
+      .map((entry) => resolveEntry(entry, options)) as Base[];
   }
 
   /**
@@ -192,6 +184,11 @@ export default class TypedRegistry<
 }
 
 /**
+ * 登録内容の種別を表すプロパティ
+ */
+const ENTRY_KINDS = ['class', 'factory', 'value'] as const;
+
+/**
  * 登録内容の1件を Store に保存する形式に変換する
  * @param key
  * @param entry
@@ -200,11 +197,18 @@ export default class TypedRegistry<
 function _toStoreEntry(
   key: string,
   entry: RegistryEntry,
-): Omit<StoreEntry, 'tags'> & { tags?: string[] } {
+): Omit<StoreEntry, 'tags'> & { tags?: readonly string[] } {
   if (typeof entry === 'function') {
     return { key, raw: entry, type: 'instance' };
   }
   if (entry != null && typeof entry === 'object') {
+    // 種別を表すプロパティが複数ある場合は、どれを使うか決められないため不正とする
+    const kinds = ENTRY_KINDS.filter((kind) => kind in entry);
+    if (kinds.length > 1) {
+      throw new Error(
+        `Invalid entry for key "${key}". Use only one of ${kinds.map((kind) => `{ ${kind} }`).join(', ')}`,
+      );
+    }
     if ('class' in entry) {
       const { class: raw, tags, singleton } = entry;
       return { key, raw, type: 'instance', tags, singleton };

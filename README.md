@@ -89,22 +89,27 @@ The parameters of a factory function need type annotations, since there is nothi
 
 `{ class }` / `{ factory }`
 
-| Option      | Type       | Description                                                                                         |
-| ----------- | ---------- | --------------------------------------------------------------------------------------------------- |
-| `tags`      | `string[]` | Tags used by `resolveByTag` / `getRawByTag`                                                         |
-| `singleton` | `boolean`  | Return the first resolved value every time. `args` passed to the second and later calls are ignored |
+| Option       | Type                | Description                                                                                         |
+| ------------ | ------------------- | --------------------------------------------------------------------------------------------------- |
+| `tags?`      | `readonly string[]` | Tags used by `resolveByTag` / `getRawByTag`                                                         |
+| `singleton?` | `boolean`           | Return the first resolved value every time. `args` passed to the second and later calls are ignored |
 
 `{ value }`
 
-| Option  | Type       | Description                                                          |
-| ------- | ---------- | -------------------------------------------------------------------- |
-| `tags`  | `string[]` | Tags used by `resolveByTag` / `getRawByTag`                          |
-| `clone` | `boolean`  | Return a deep copy each time. By default the value is returned as is |
+| Option   | Type                | Description                                                          |
+| -------- | ------------------- | -------------------------------------------------------------------- |
+| `tags?`  | `readonly string[]` | Tags used by `resolveByTag` / `getRawByTag`                          |
+| `clone?` | `boolean`           | Return a deep copy each time. By default the value is returned as is |
+
+`clone: true` makes deep copies with [klona](https://github.com/lukeed/klona) (`klona/full`), with the following limitations.
+
+- A class instance is copied with its prototype and own properties. `#private` fields are not copied, so calling a method that uses them throws a `TypeError`
+- Functions are not copied; the same function is referenced
 
 ## Child registries
 
 - The child can use everything in the parent. Since registries are immutable, the parent never changes.
-- An entry with an existing key replaces it only in the child.
+- An entry with an existing key replaces it only in the child.The child registry does not inherit `Base`. A child registry created with `extend` inside a function that receives a registry cannot be used as `Base`. Extend the registry on the user side before passing it.
 - `has` / `keys` / `resolveByTag` include the parent's entries.
 - An entry with `singleton: true` in the parent returns the same instance in the parent and the children.
 
@@ -198,42 +203,150 @@ When also providing a preset registry with all entries, put it in a separate mod
 
 ## API
 
-### Constructor
+### `TypedRegistry<E, Base>`
 
-`new TypedRegistry(entries, options?)`
+| Method                           | Description                                                      |
+| -------------------------------- | ---------------------------------------------------------------- |
+| `constructor(entries, options?)` | Creates a registry with the entries                              |
+| `resolve(key, options?)`         | Returns the instance / value for the key                         |
+| `resolveSpec(spec)`              | Returns the instance / value for a pair of the key and `args`    |
+| `resolveByTag(tag, options?)`    | Returns the instances / values for all entries with the tag      |
+| `has(key)`                       | Returns whether the key is registered                            |
+| `keys()`                         | Returns all registered keys                                      |
+| `getRaw(key)`                    | Returns the registered class / function / value as is            |
+| `getRawByTag(tag)`               | Returns the registered classes / functions / values with the tag |
+| `extend(entries, options?)`      | Creates a child registry with added or replaced entries          |
+
+| Property | Type                  | Description        |
+| -------- | --------------------- | ------------------ |
+| `id`     | `string \| undefined` | ID of the registry |
+
+#### `constructor`
+
+```ts
+constructor(entries: E, options?: TypedRegistryOptions)
+```
+
+Creates a registry with the entries. The entries cannot be changed after creation.\
+Throws if an entry is invalid (it has none or more than one of `class` / `factory` / `value`).
+
+| Parameter  | Type                   | Description       |
+| ---------- | ---------------------- | ----------------- |
+| `entries`  | `E`                    | Entries           |
+| `options?` | `TypedRegistryOptions` | The options below |
 
 | Option | Type     | Description                                       |
 | ------ | -------- | ------------------------------------------------- |
-| `id`   | `string` | ID of the registry. Included in the error message |
+| `id?`  | `string` | ID of the registry. Included in the error message |
 
-### Members
+#### `resolve`
 
-| Member                        | Description                                                                                   |
-| ----------------------------- | --------------------------------------------------------------------------------------------- |
-| `resolve(key, options?)`      | Returns the instance / value for the key. Throws if the key is not registered                 |
-| `resolveSpec({ key, args })`  | Same as `resolve`, with the key and `args` as a pair                                          |
-| `resolveByTag(tag, options?)` | Returns the instances / values for all entries with the tag. The same `args` is passed to all |
-| `has(key)`                    | Returns whether the key is registered                                                         |
-| `keys()`                      | Returns all registered keys                                                                   |
-| `getRaw(key)`                 | Returns the registered class / function / value as is. Throws if the key is not registered    |
-| `getRawByTag(tag)`            | Returns the registered classes / functions / values with the tag as is                        |
-| `extend(entries, options?)`   | Creates a child registry with additional entries                                              |
-| `id`                          | ID of the registry                                                                            |
+```ts
+resolve<K extends RegistryKey<E>>(
+  key: K,
+  ...[options]: ResolveRestArgs<E, K>
+): Resolved<Base, E, K>
+```
 
-## Types
+Returns the instance / value for the key. Throws if the key is not registered.\
+If there are required arguments, `options` and `args` cannot be omitted.\
+A union of keys is accepted only when none of the keys has required arguments, since the types cannot guarantee that `args` matches the key at runtime. Use `resolveSpec` when the union includes a key with required arguments.
 
-| Type                     | Description                                                                    |
-| ------------------------ | ------------------------------------------------------------------------------ |
-| `TypedRegistry<E, Base>` | The registry. Specify `Base` to use resolved values as `Base`                  |
-| `RegistryEntries<Base>`  | Entries. Use it as the constraint of `E`, or with `satisfies` to check entries |
-| `RegistryEntriesOf<R>`   | Entries of a registry                                                          |
-| `ResolveSpec<E>`         | Union of `{ key, args }` pairs for each key                                    |
-| `RegistryKey<E>`         | Keys                                                                           |
-| `ResolveArgs<E, K>`      | `args` for the key                                                             |
-| `Resolved<Base, E, K>`   | Return type of `resolve` for the key                                           |
-| `RegistryRaw<E, K>`      | Registered class / function / value for the key                                |
-| `RegistryValue<E>`       | Union of all resolved values                                                   |
-| `TypedRegistryOptions`   | Options of the constructor and `extend`                                        |
+| Parameter  | Type                   | Description       |
+| ---------- | ---------------------- | ----------------- |
+| `key`      | `K`                    | Key               |
+| `options?` | `ResolveOptions<Args>` | The options below |
+
+| Option  | Type   | Description                                                                   |
+| ------- | ------ | ----------------------------------------------------------------------------- |
+| `args?` | `Args` | Arguments for the constructor or the factory function. Not allowed for values |
+
+#### `resolveSpec`
+
+```ts
+resolveSpec<S extends ResolveSpec<E>>(spec: S): Resolved<Base, E, S['key']>
+```
+
+Returns the instance / value for a pair of the key and `args` (`{ key, args }`). Throws if the key is not registered.\
+Use it to pass a key and arguments built from settings as they are.
+
+#### `resolveByTag`
+
+```ts
+resolveByTag(tag: string, options?: ResolveOptions): Base[]
+```
+
+Returns the instances / values for all entries with the tag, in registration order. The same `args` is passed to all entries.
+
+#### `has`
+
+```ts
+has(key: string): key is RegistryKey<E>
+```
+
+Returns whether the key is registered. When `true`, `key` is narrowed to the key type of the registry.
+
+#### `keys`
+
+```ts
+keys(): RegistryKey<E>[]
+```
+
+Returns all registered keys in registration order.
+
+#### `getRaw`
+
+```ts
+getRaw<K extends RegistryKey<E>>(key: K): RegistryRaw<E, K>
+```
+
+Returns the registered class / function / value as is. Throws if the key is not registered.
+
+#### `getRawByTag`
+
+```ts
+getRawByTag(tag: string): RegistryRaw<E>[]
+```
+
+Returns the registered classes / functions / values with the tag as is, in registration order.
+
+#### `extend`
+
+```ts
+extend<E2 extends RegistryEntries>(
+  entries: E2,
+  options?: TypedRegistryOptions,
+): TypedRegistry<Merge<E, E2>>
+```
+
+Creates a child registry that inherits the parent's entries and adds the given entries. An entry with an existing key replaces it only in the child.
+
+| Parameter  | Type                   | Description                                                 |
+| ---------- | ---------------------- | ----------------------------------------------------------- |
+| `entries`  | `E2`                   | Entries to add or replace                                   |
+| `options?` | `TypedRegistryOptions` | Same options as the constructor (independent of the parent) |
+
+### Types
+
+| Type                    | Description                                                                    |
+| ----------------------- | ------------------------------------------------------------------------------ |
+| `RegistryEntries<Base>` | Entries. Use it as the constraint of `E`, or with `satisfies` to check entries |
+| `RegistryEntry<Base>`   | A single entry                                                                 |
+| `ClassEntry<C>`         | A class entry (`{ class }`)                                                    |
+| `FactoryEntry<F>`       | A factory function entry (`{ factory }`)                                       |
+| `ValueEntry<V>`         | A value entry (`{ value }`)                                                    |
+| `RegistryEntriesOf<R>`  | Entries of a registry                                                          |
+| `ResolveSpec<E>`        | Union of `{ key, args }` pairs for each key                                    |
+| `RegistryKey<E>`        | Keys                                                                           |
+| `ResolveArgs<E, K>`     | `args` for the key                                                             |
+| `ResolveOptions<Args>`  | Options of `resolve` / `resolveByTag`                                          |
+| `ResolveRestArgs<E, K>` | The `options` part of the parameters of `resolve`                              |
+| `Resolved<Base, E, K>`  | Return type of `resolve` for the key                                           |
+| `RegistryRaw<E, K>`     | Registered class / function / value for the key                                |
+| `RegistryValue<E>`      | Union of all resolved values                                                   |
+| `TypedRegistryOptions`  | Options of the constructor and `extend`                                        |
+
+Specify `Base` of `TypedRegistry<E, Base>` to use resolved values as `Base` (see "[Receiving a registry](#receiving-a-registry)").
 
 ## License
 
