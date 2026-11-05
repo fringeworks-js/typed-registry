@@ -1,4 +1,4 @@
-import type { ResolverFunction, ResolverType } from '../../types';
+import type { ResolverFunction, ResolverType } from '../../_types';
 import resolveAsClone from './resolveAsClone';
 import resolveAsFactory from './resolveAsFactory';
 import resolveAsInstance from './resolveAsInstance';

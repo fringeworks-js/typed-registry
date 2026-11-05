@@ -1,5 +1,5 @@
 import type { SetOptional } from 'type-fest';
-import type { ResolverType, StoreEntry } from '../types';
+import type { ResolverType, StoreEntry } from '../_types';
 import Store from './Store';
 
 // テスト用のダミー値

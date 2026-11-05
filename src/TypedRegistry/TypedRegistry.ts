@@ -1,7 +1,7 @@
 import type { Merge } from 'type-fest';
-import resolveEntry from '../_internal/resolveEntry';
-import Store from '../_internal/Store';
-import type { StoreEntry } from '../_internal/types';
+import resolveEntry from '../_internal/_resolveEntry';
+import Store from '../_internal/_Store';
+import type { StoreEntry } from '../_internal/_types';
 import type {
   RegistryEntries,
   RegistryEntry,

@@ -1,5 +1,5 @@
 import type { SetOptional } from 'type-fest';
-import type { StoreEntry } from '../types';
+import type { StoreEntry } from '../_types';
 
 /**
  * エントリーを保持するためのクラス
